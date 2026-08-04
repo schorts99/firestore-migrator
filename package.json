@@ -1,0 +1,55 @@
+{
+  "name": "@schorts/firestore-migrator",
+  "version": "0.1.0",
+  "license": "LGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "description": "Declarative migration tool for Cloud Firestore. Define field additions, removals, and transforms in simple migration files, then apply or roll them back with a single CLI command.",
+  "keywords": [
+    "firestore",
+    "migrations",
+    "firebase-admin",
+    "cli"
+  ],
+  "author": {
+    "name": "Jorge Castillo",
+    "email": "schorts@outlook.com",
+    "url": "https://schorts.netlify.app"
+  },
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js"
+  },
+  "bin": {
+    "firestore-migrator": "./bin/firestore-migrator.js"
+  },
+  "scripts": {
+    "generate": "node bin/firestore-migrator.js generate",
+    "migrate": "node bin/firestore-migrator.js migrate",
+    "rollback": "node bin/firestore-migrator.js rollback",
+    "status": "node bin/firestore-migrator.js status"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.2.0"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "README.md",
+    "CHANGELOG"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/schorts99/firestore-migrator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/schorts99/firestore-migrator/issues"
+  },
+  "homepage": "https://github.com/schorts99/firestore-migrator#readme"
+}
