@@ -32,7 +32,7 @@
     "status": "node bin/firestore-migrator.js status"
   },
   "dependencies": {
-    "firebase-admin": "^14.2.0"
+    "firebase-admin": "^14.3.0"
   },
   "files": [
     "bin/",
