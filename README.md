@@ -1,4 +1,4 @@
-# @schortsfirestore-migrator
+# @schorts/firestore-migrator
 
 Declarative migration tool for Cloud Firestore. Define field additions, removals, and transforms in simple migration files, then apply or roll them back with a single CLI command. Optionally keep a live `firestore.schema.json` in sync after every migrate or rollback.
 
@@ -7,13 +7,14 @@ Requires **Node.js ≥ 18** and a Firebase service account (or Application Defau
 ## Install
 
 ```bash
-npm install @schorts/firestore-migrator
+npm install schorts/firestore-migrator
 ```
 
 ## Quick start
 
 ```bash
-# 0. Optional: project config file
+# 0. Optional: project config + env
+cp .env.example .env   # or create .env with your credentials
 firestore-migrator init
 
 # 1. Create a migration
@@ -67,6 +68,8 @@ firestore-migrator status
 | Option | Description |
 |--------|-------------|
 | `--config <path>` | Path to TOML config (default: `./firestore-migrator.toml` if present) |
+| `--env-file <path>` | Path to `.env` file (default: `./.env`, then `./.env.local`) |
+| `--env-override` | Let `.env` values override existing environment variables |
 | `-d, --migrations-dir <path>` | Directory with migration files (default: `./migrations`) |
 | `-t, --tracking-collection <name>` | Collection that records applied migrations (default: `__migrations`) |
 | `--schema-path <path>` | Schema output path (default: `./firestore.schema.json`) |
@@ -84,9 +87,29 @@ firestore-migrator status
 ### Precedence (highest → lowest)
 
 1. CLI flags
-2. Environment variables
+2. Environment variables (including values loaded from `.env`)
 3. `firestore-migrator.toml`
 4. Built-in defaults
+
+### `.env` files
+
+`loadConfig()` automatically loads **`./.env`**, then **`./.env.local`** if `.env` is missing. Variables already set in the shell/CI are **not** overwritten unless you pass `--env-override`.
+
+```bash
+# .env
+FIREBASE_PROJECT_ID=my-project
+GOOGLE_APPLICATION_CREDENTIALS=./serviceAccount.json
+FIREBASE_CLIENT_EMAIL=sa@my-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+```bash
+firestore-migrator migrate
+firestore-migrator migrate --env-file ./config/.env.staging
+firestore-migrator migrate --env-override
+```
+
+`.env` is listed in `.gitignore` by default — keep secrets out of git.
 
 ### `firestore-migrator init`
 
@@ -230,11 +253,12 @@ One document is sampled per collection (`limit(1)`). Empty collections are recor
 
 ## How it works
 
-1. Migration files live in `./migrations` (or `migrations_dir`) and are named `YYYYMMDDHHmmss_<slug>.js`.
-2. Applied migrations are recorded in a tracking collection (`__migrations` by default).
-3. `migrate` runs pending files in timestamp order, applying `up` with batched writes.
-4. `rollback` applies `down` and removes the tracking record.
-5. Schema is optionally refreshed for touched collections after migrate/rollback.
+1. `.env` / `.env.local` is loaded into `process.env` (if present).
+2. Migration files live in `./migrations` (or `migrations_dir`) and are named `YYYYMMDDHHmmss_<slug>.js`.
+3. Applied migrations are recorded in a tracking collection (`__migrations` by default).
+4. `migrate` runs pending files in timestamp order, applying `up` with batched writes.
+5. `rollback` applies `down` and removes the tracking record.
+6. Schema is optionally refreshed for touched collections after migrate/rollback.
 
 Collections are paginated so large datasets stay memory-safe. `add` skips fields that already exist.
 
@@ -249,15 +273,17 @@ import {
   runSchema,
   runInitConfig,
   loadConfig,
+  loadEnvFile,
 } from "firestore-migrator";
 
+loadEnvFile(); // optional; also runs inside loadConfig()
 runInitConfig();
 
 await runMigrate({ dryRun: true });
 await runSchema({}, ["users", "orders"]);
 ```
 
-Pass the same option names as the CLI flags (camelCase), e.g. `migrationsDir`, `schemaPath`, `projectId`, `credentials`, `skipSchema`, `config`.
+Pass the same option names as the CLI flags (camelCase), e.g. `migrationsDir`, `schemaPath`, `projectId`, `credentials`, `skipSchema`, `config`, `envFile`, `envOverride`.
 
 ## License
 

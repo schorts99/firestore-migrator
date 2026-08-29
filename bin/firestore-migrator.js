@@ -16,6 +16,8 @@ Commands:
 
 Global options:
   --config <path>                Path to TOML config (default: ./firestore-migrator.toml)
+  --env-file <path>              Path to .env file (default: ./.env then ./.env.local)
+  --env-override                 Let .env values override existing environment variables
   -d, --migrations-dir <path>    Migrations directory (default: ./migrations)
   -t, --tracking-collection <n>  Tracking collection (default: __migrations)
   --schema-path <path>           Schema output path (default: ./firestore.schema.json)
@@ -64,6 +66,10 @@ function parseArgs(argv) {
       flags.force = true;
     } else if (a === "--config") {
       flags.config = args[++i];
+    } else if (a === "--env-file") {
+      flags.envFile = args[++i];
+    } else if (a === "--env-override") {
+      flags.envOverride = true;
     } else if (a === "-o" || a === "--output") {
       flags.output = args[++i];
     } else if (a === "-d" || a === "--migrations-dir") {
@@ -99,7 +105,7 @@ async function main() {
   const command = positional[0];
 
   if (flags.version) {
-    console.log("0.2.0");
+    console.log("0.3.0");
 
     return;
   }
