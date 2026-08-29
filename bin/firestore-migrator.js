@@ -7,6 +7,7 @@ Usage:
   firestore-migrator <command> [options]
 
 Commands:
+  init                           Create firestore-migrator.toml in the current directory
   generate <name> [collection]   Create a new migration file
   migrate                        Apply all pending migrations
   rollback                       Roll back the latest applied migration(s)
@@ -14,6 +15,7 @@ Commands:
   status                         List migrations and their state
 
 Global options:
+  --config <path>                Path to TOML config (default: ./firestore-migrator.toml)
   -d, --migrations-dir <path>    Migrations directory (default: ./migrations)
   -t, --tracking-collection <n>  Tracking collection (default: __migrations)
   --schema-path <path>           Schema output path (default: ./firestore.schema.json)
@@ -23,15 +25,19 @@ Global options:
   --dry-run                      Simulate without writing
   --skip-schema                  Do not refresh schema after migrate/rollback
   --no-merge                     schema: replace file instead of merging collections
+  --force                        init: overwrite existing config
+  -o, --output <path>            init: output path for config file
   -h, --help                     Show help
   -v, --version                  Show version
 
+Config precedence (highest → lowest):
+  CLI flags  >  environment variables  >  firestore-migrator.toml  >  defaults
+
 Examples:
+  firestore-migrator init
   firestore-migrator generate add-user-status users
   firestore-migrator migrate --dry-run
-  firestore-migrator migrate --only add-user-status
-  firestore-migrator rollback --steps 1
-  firestore-migrator schema
+  firestore-migrator migrate --config ./config/prod.toml
   firestore-migrator schema users orders
   firestore-migrator status
 `.trim();
@@ -54,6 +60,12 @@ function parseArgs(argv) {
       flags.skipSchema = true;
     } else if (a === "--no-merge") {
       flags.noMerge = true;
+    } else if (a === "--force") {
+      flags.force = true;
+    } else if (a === "--config") {
+      flags.config = args[++i];
+    } else if (a === "-o" || a === "--output") {
+      flags.output = args[++i];
     } else if (a === "-d" || a === "--migrations-dir") {
       flags.migrationsDir = args[++i];
     } else if (a === "-t" || a === "--tracking-collection") {
@@ -87,7 +99,7 @@ async function main() {
   const command = positional[0];
 
   if (flags.version) {
-    console.log("0.1.0");
+    console.log("0.2.0");
 
     return;
   }
@@ -99,6 +111,14 @@ async function main() {
   }
 
   try {
+    if (command === "init") {
+      const { runInitConfig } = await import("../lib/init-config.js");
+
+      runInitConfig(flags);
+
+      return;
+    }
+
     if (command === "generate" || command === "g") {
       const name = positional[1];
       const collection = positional[2] || "your_collection";
