@@ -7,7 +7,7 @@ Requires **Node.js ≥ 18** and a Firebase service account (or Application Defau
 ## Install
 
 ```bash
-npm install schorts/firestore-migrator
+npm install -D @schorts/firestore-migrator
 ```
 
 ## Quick start
@@ -86,10 +86,10 @@ firestore-migrator status
 
 ### Precedence (highest → lowest)
 
-1. CLI flags
-2. Environment variables (including values loaded from `.env`)
-3. `firestore-migrator.toml`
-4. Built-in defaults
+1. CLI flags  
+2. Environment variables (including values loaded from `.env`)  
+3. `firestore-migrator.toml`  
+4. Built-in defaults  
 
 ### `.env` files
 
@@ -257,10 +257,22 @@ One document is sampled per collection (`limit(1)`). Empty collections are recor
 2. Migration files live in `./migrations` (or `migrations_dir`) and are named `YYYYMMDDHHmmss_<slug>.js`.
 3. Applied migrations are recorded in a tracking collection (`__migrations` by default).
 4. `migrate` runs pending files in timestamp order, applying `up` with batched writes.
-5. `rollback` applies `down` and removes the tracking record.
-6. Schema is optionally refreshed for touched collections after migrate/rollback.
+5. **On failure mid-migration**, any documents already written in successful batches get a compensating **`down`** (only those docs). The migration is **not** marked applied. A non-empty `down` block is required for this.
+6. `rollback` applies `down` to the whole collection and removes the tracking record.
+7. Schema is optionally refreshed for touched collections after migrate/rollback.
 
 Collections are paginated so large datasets stay memory-safe. `add` skips fields that already exist.
+
+### Failure & compensate
+
+| Outcome | Behavior |
+|---------|----------|
+| Batch commits, later batch fails | `down` runs on docs from successful batches only |
+| Failure before any commit | Nothing to compensate |
+| No usable `down` | Warning; partial `up` left in place |
+| Compensate fails | Error logged; manual repair may be needed |
+
+`down` is declarative (not a snapshot). It restores state only as well as your reverse ops define — e.g. `remove` in `up` cannot recover deleted values unless `down` re-`add`s them with known defaults.
 
 ## Programmatic usage
 
@@ -287,4 +299,4 @@ Pass the same option names as the CLI flags (camelCase), e.g. `migrationsDir`, `
 
 ## License
 
-See `package.json` for the package license.
+LGPL-3.0-or-later
