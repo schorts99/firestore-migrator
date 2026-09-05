@@ -1,6 +1,13 @@
 # @schorts/firestore-migrator
 
-Declarative migration tool for Cloud Firestore. Define field additions, removals, and transforms in simple migration files, then apply or roll them back with a single CLI command. Optionally keep a live `firestore.schema.json` in sync after every migrate or rollback.
+Declarative migration tool for Cloud Firestore. Define field additions, removals, and transforms in simple migration files, then apply or roll them back with a single CLI command.
+
+Features:
+
+- Declarative `up` / `down` operations (`add`, `remove`, `update`)
+- Before-image **snapshots** for exact restore on failure and rollback
+- Optional live **schema** file refreshed after migrate/rollback
+- Project config via `firestore-migrator.toml`, `.env`, and CLI flags
 
 Requires **Node.js ≥ 18** and a Firebase service account (or Application Default Credentials).
 
@@ -10,12 +17,14 @@ Requires **Node.js ≥ 18** and a Firebase service account (or Application Defau
 npm install -D @schorts/firestore-migrator
 ```
 
+The CLI binary is always `firestore-migrator`.
+
 ## Quick start
 
 ```bash
-# 0. Optional: project config + env
-cp .env.example .env   # or create .env with your credentials
+# 0. Config + credentials
 firestore-migrator init
+# put secrets in .env (auto-loaded) or set GOOGLE_APPLICATION_CREDENTIALS
 
 # 1. Create a migration
 firestore-migrator generate add-user-status users
@@ -29,12 +38,11 @@ firestore-migrator migrate --dry-run
 # 4. Apply
 firestore-migrator migrate
 
-# 5. Check state
+# 5. Status
 firestore-migrator status
 
-# 6. Inspect / refresh schema
+# 6. Schema (optional)
 firestore-migrator schema
-# or only some collections
 firestore-migrator schema users orders
 
 # 7. Roll back last migration
@@ -60,8 +68,8 @@ firestore-migrator status
 | `generate` | Create a new timestamped migration file |
 | `migrate` | Apply all pending migrations (or one with `--only`) |
 | `rollback` | Roll back the latest applied migration(s) |
-| `schema` | Sample one document per collection and write `firestore.schema.json` |
-| `status` | List migrations and whether each is applied or pending |
+| `schema` | Sample collections and write `firestore.schema.json` |
+| `status` | List migrations and applied / pending state |
 
 ### Global options
 
@@ -73,12 +81,13 @@ firestore-migrator status
 | `-d, --migrations-dir <path>` | Directory with migration files (default: `./migrations`) |
 | `-t, --tracking-collection <name>` | Collection that records applied migrations (default: `__migrations`) |
 | `--schema-path <path>` | Schema output path (default: `./firestore.schema.json`) |
+| `--snapshots-dir <path>` | Before-image snapshots directory (default: `<migrationsDir>/.snapshots`) |
 | `--project-id <id>` | GCP / Firebase project id |
 | `-c, --credentials <path>` | Path to service account JSON |
 | `--batch-size <n>` | Max writes per Firestore batch (default: `400`) |
 | `--dry-run` | Simulate without writing |
 | `--skip-schema` | Do not refresh schema after migrate/rollback |
-| `--no-merge` | `schema` only: replace the schema file instead of merging collections |
+| `--no-merge` | `schema` only: replace the schema file instead of merging |
 | `--force` | `init` only: overwrite an existing config file |
 | `-o, --output <path>` | `init` only: custom path for the config file |
 
@@ -93,7 +102,7 @@ firestore-migrator status
 
 ### `.env` files
 
-`loadConfig()` automatically loads **`./.env`**, then **`./.env.local`** if `.env` is missing. Variables already set in the shell/CI are **not** overwritten unless you pass `--env-override`.
+`loadConfig()` loads **`./.env`**, then **`./.env.local`** if `.env` is missing. Existing shell/CI variables are **not** overwritten unless you pass `--env-override`.
 
 ```bash
 # .env
@@ -109,7 +118,7 @@ firestore-migrator migrate --env-file ./config/.env.staging
 firestore-migrator migrate --env-override
 ```
 
-`.env` is listed in `.gitignore` by default — keep secrets out of git.
+`.env` is listed in `.gitignore` by default.
 
 ### `firestore-migrator init`
 
@@ -126,6 +135,7 @@ Example `firestore-migrator.toml`:
 migrations_dir       = "migrations"
 tracking_collection  = "__migrations"
 schema_path          = "firestore.schema.json"
+snapshots_dir        = "migrations/.snapshots"
 batch_size           = 400
 skip_schema          = false
 
@@ -157,6 +167,7 @@ String values support `${VAR}` and `$VAR` expansion. The optional `[env]` sectio
 | `FIRESTORE_MIGRATIONS_DIR` | Migrations directory |
 | `FIRESTORE_MIGRATIONS_TRACKING` | Tracking collection name |
 | `FIRESTORE_SCHEMA_PATH` | Schema file path |
+| `FIRESTORE_SNAPSHOTS_DIR` | Snapshots directory |
 | `FIRESTORE_MIGRATIONS_BATCH_SIZE` | Batch size |
 | `FIRESTORE_SKIP_SCHEMA` | `1` to skip schema refresh |
 
@@ -183,7 +194,7 @@ export default {
     },
   },
 
-  // Required for rollback — reverse of `up`
+  // Used when no snapshot is available (fallback)
   down: {
     add: {},
     remove: ["status", "fullName"],
@@ -196,11 +207,54 @@ export default {
 
 | Key | Purpose |
 |-----|---------|
-| `add` | Add fields. Use `{ default: value }` for a static value or `{ from: (doc) => value }` to compute from the current document. Existing fields are left untouched (idempotent). |
+| `add` | Add fields. Use `{ default: value }` or `{ from: (doc) => value }`. Existing fields are left untouched (idempotent). |
 | `remove` | Array of field names to delete (`FieldValue.delete()`). |
 | `update` | Map of field → `(doc) => newValue` transforms. |
 
-`down` must be present and non-empty to roll a migration back.
+Prefer keeping a useful `down` block even when snapshots exist — it is the fallback if the snapshot file is missing.
+
+## Snapshots, failure & rollback
+
+During `migrate`, before each document is updated a **before-image** is written to:
+
+```text
+<migrationsDir>/.snapshots/<migrationId>.json
+```
+
+Example:
+
+```json
+{
+  "migrationId": "20260905120000_add-status",
+  "collection": "users",
+  "documents": {
+    "user_1": {
+      "status": { "__absent": true },
+      "email": "Old@Email.com",
+      "legacyFlag": true
+    }
+  }
+}
+```
+
+| Situation | Behavior |
+|-----------|----------|
+| **Migrate fails** mid-way | Restores **only committed docs** from the snapshot (exact previous values), then deletes the snapshot. Migration is **not** marked applied. |
+| **Manual `rollback`** | Prefers snapshot restore for the whole migration; deletes snapshot when done |
+| **No snapshot** | Falls back to declarative `down` |
+| **No snapshot and no `down`** | Cannot compensate / roll back — warning or error |
+
+- `__absent` means the field was added by `up` and should be deleted on restore.
+- Timestamps, GeoPoints, references, and bytes are serialized so they can be written back.
+- Keep `migrations/.snapshots/` out of git if snapshots may contain sensitive data (listed in `.gitignore`).
+
+Configure the directory via:
+
+```toml
+snapshots_dir = "migrations/.snapshots"
+```
+
+or `FIRESTORE_SNAPSHOTS_DIR` / `--snapshots-dir`.
 
 ## Schema
 
@@ -256,23 +310,12 @@ One document is sampled per collection (`limit(1)`). Empty collections are recor
 1. `.env` / `.env.local` is loaded into `process.env` (if present).
 2. Migration files live in `./migrations` (or `migrations_dir`) and are named `YYYYMMDDHHmmss_<slug>.js`.
 3. Applied migrations are recorded in a tracking collection (`__migrations` by default).
-4. `migrate` runs pending files in timestamp order, applying `up` with batched writes.
-5. **On failure mid-migration**, any documents already written in successful batches get a compensating **`down`** (only those docs). The migration is **not** marked applied. A non-empty `down` block is required for this.
-6. `rollback` applies `down` to the whole collection and removes the tracking record.
+4. `migrate` runs pending files in timestamp order, applying `up` with batched writes and writing before-image snapshots.
+5. **On failure mid-migration**, committed docs are restored from the **snapshot**. The migration is **not** marked applied.
+6. **`rollback`** restores from the snapshot when present; otherwise uses declarative `down`. Tracking record is removed.
 7. Schema is optionally refreshed for touched collections after migrate/rollback.
 
 Collections are paginated so large datasets stay memory-safe. `add` skips fields that already exist.
-
-### Failure & compensate
-
-| Outcome | Behavior |
-|---------|----------|
-| Batch commits, later batch fails | `down` runs on docs from successful batches only |
-| Failure before any commit | Nothing to compensate |
-| No usable `down` | Warning; partial `up` left in place |
-| Compensate fails | Error logged; manual repair may be needed |
-
-`down` is declarative (not a snapshot). It restores state only as well as your reverse ops define — e.g. `remove` in `up` cannot recover deleted values unless `down` re-`add`s them with known defaults.
 
 ## Programmatic usage
 
@@ -293,9 +336,10 @@ runInitConfig();
 
 await runMigrate({ dryRun: true });
 await runSchema({}, ["users", "orders"]);
+await runRollback({ steps: 1 });
 ```
 
-Pass the same option names as the CLI flags (camelCase), e.g. `migrationsDir`, `schemaPath`, `projectId`, `credentials`, `skipSchema`, `config`, `envFile`, `envOverride`.
+Pass the same option names as the CLI flags (camelCase), e.g. `migrationsDir`, `schemaPath`, `snapshotsDir`, `projectId`, `credentials`, `skipSchema`, `config`, `envFile`, `envOverride`.
 
 ## License
 

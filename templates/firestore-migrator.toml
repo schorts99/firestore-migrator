@@ -10,10 +10,12 @@
 # The [env] section maps config keys to env var *names* (not values).
 # Useful so secrets stay out of the file while still centralizing which vars to read.
 
-# ── paths & behavior -──────────────────────────────────────────
+# ── paths & behaviour ──────────────────────────────────────────
 migrations_dir       = "migrations"
 tracking_collection  = "__migrations"
 schema_path          = "firestore.schema.json"
+# Before-images for migrate failure + rollback (default: <migrations_dir>/.snapshots)
+snapshots_dir        = "migrations/.snapshots"
 batch_size           = 400
 skip_schema          = false
 
