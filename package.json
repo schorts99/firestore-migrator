@@ -26,6 +26,7 @@
     "firestore-migrator": "./bin/firestore-migrator.js"
   },
   "scripts": {
+		"init": "node bin/firestore-migrator.js init",
     "generate": "node bin/firestore-migrator.js generate",
     "migrate": "node bin/firestore-migrator.js migrate",
     "rollback": "node bin/firestore-migrator.js rollback",

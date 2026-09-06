@@ -21,6 +21,7 @@ Global options:
   -d, --migrations-dir <path>    Migrations directory (default: ./migrations)
   -t, --tracking-collection <n>  Tracking collection (default: __migrations)
   --schema-path <path>           Schema output path (default: ./firestore.schema.json)
+	--snapshots-dir <path>         Before-image snapshots dir (default: <migrations>/.snapshots)
   --project-id <id>              Firebase / GCP project id
   -c, --credentials <path>       Path to service account JSON
   --batch-size <n>               Max ops per batch (default: 400)
@@ -78,7 +79,9 @@ function parseArgs(argv) {
       flags.trackingCollection = args[++i];
     } else if (a === "--schema-path") {
       flags.schemaPath = args[++i];
-    } else if (a === "--project-id") {
+    } else if (a === "--snapshots-dir") {
+			flags.snapshotsDir = args[++i];
+		} else if (a === "--project-id") {
       flags.projectId = args[++i];
     } else if (a === "-c" || a === "--credentials") {
       flags.credentials = args[++i];
@@ -105,7 +108,7 @@ async function main() {
   const command = positional[0];
 
   if (flags.version) {
-    console.log("0.3.0");
+    console.log("0.5.0");
 
     return;
   }
