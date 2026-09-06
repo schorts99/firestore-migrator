@@ -196,7 +196,16 @@ async function main() {
   } catch (err) {
     console.error("Error:", err.message);
 
-    if (process.env.DEBUG) console.error(err);
+		if (err instanceof SyntaxError || err.name === "SyntaxError") {
+      if (err.stack) console.error(err.stack);
+
+      console.error(
+        "\nHint: a .js file failed to parse (often a migration or a local edit).\n" +
+          "Run: node --check <file>  or  DEBUG=1 firestore-migrator <command>"
+      );
+    } else if (process.env.DEBUG) {
+      console.error(err);
+    }
 
     process.exit(1);
   }
