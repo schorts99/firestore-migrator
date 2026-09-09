@@ -45,8 +45,9 @@ firestore-migrator status
 firestore-migrator schema
 firestore-migrator schema users orders
 
-# 7. Roll back last migration
+# 7. Roll back last migration (or multiple steps)
 firestore-migrator rollback
+firestore-migrator rollback 2       # or: firestore-migrator rollback --steps 2
 ```
 
 ## CLI
@@ -54,8 +55,8 @@ firestore-migrator rollback
 ```
 firestore-migrator init
 firestore-migrator generate <name> [collection]
-firestore-migrator migrate   [--dry-run] [--only <id>] [--skip-schema]
-firestore-migrator rollback  [--steps <n>] [--only <id>] [--dry-run] [--skip-schema]
+firestore-migrator migrate   [--dry-run] [--only <name|id>] [--skip-schema]
+firestore-migrator rollback  [steps] [--steps <n>] [--only <name|id>] [--dry-run] [--skip-schema]
 firestore-migrator schema    [collections...] [--no-merge]
 firestore-migrator status
 ```
@@ -67,7 +68,7 @@ firestore-migrator status
 | `init` | Create `firestore-migrator.toml` in the current directory |
 | `generate` | Create a new timestamped migration file |
 | `migrate` | Apply all pending migrations (or one with `--only`) |
-| `rollback` | Roll back the latest applied migration(s) |
+| `rollback` | Roll back the latest applied migration(s) (`[steps]`, `--steps <n>`, or `--only`) |
 | `schema` | Sample collections and write `firestore.schema.json` |
 | `status` | List migrations and applied / pending state |
 
@@ -85,6 +86,8 @@ firestore-migrator status
 | `--project-id <id>` | GCP / Firebase project id |
 | `-c, --credentials <path>` | Path to service account JSON |
 | `--batch-size <n>` | Max writes per Firestore batch (default: `400`) |
+| `--only <name|id>` | Apply or roll back only the specified migration |
+| `--steps <n>` | Rollback only: number of migrations to revert (default: `1`) |
 | `--dry-run` | Simulate without writing |
 | `--skip-schema` | Do not refresh schema after migrate/rollback |
 | `--no-merge` | `schema` only: replace the schema file instead of merging |
@@ -169,7 +172,7 @@ String values support `${VAR}` and `$VAR` expansion. The optional `[env]` sectio
 | `FIRESTORE_SCHEMA_PATH` | Schema file path |
 | `FIRESTORE_SNAPSHOTS_DIR` | Snapshots directory |
 | `FIRESTORE_MIGRATIONS_BATCH_SIZE` | Batch size |
-| `FIRESTORE_SKIP_SCHEMA` | `1` to skip schema refresh |
+| `FIRESTORE_SKIP_SCHEMA` | `1` or `true` to skip schema refresh |
 
 ## Migration file format
 
@@ -209,7 +212,7 @@ export default {
 |-----|---------|
 | `add` | Add fields. Use `{ default: value }` or `{ from: (doc) => value }`. Existing fields are left untouched (idempotent). |
 | `remove` | Array of field names to delete (`FieldValue.delete()`). |
-| `update` | Map of field → `(doc) => newValue` transforms. |
+| `update` | Map of field → `(doc) => newValue` transforms. Returning `undefined` leaves the field unchanged. |
 
 Prefer keeping a useful `down` block even when snapshots exist — it is the fallback if the snapshot file is missing.
 
@@ -329,7 +332,11 @@ import {
   runInitConfig,
   loadConfig,
   loadEnvFile,
-} from "firestore-migrator";
+  applyOperations,
+  createSnapshotStore,
+  restoreFromSnapshot,
+  FieldValue,
+} from "@schorts/firestore-migrator";
 
 loadEnvFile(); // optional; also runs inside loadConfig()
 runInitConfig();
