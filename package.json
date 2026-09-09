@@ -23,7 +23,7 @@
     ".": "./lib/index.js"
   },
   "bin": {
-    "firestore-migrator": "./bin/firestore-migrator.js"
+    "firestore-migrator": "bin/firestore-migrator.js"
   },
   "scripts": {
     "init": "node bin/firestore-migrator.js init",
