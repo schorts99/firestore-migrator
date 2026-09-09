@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from "node:fs";
+
 const HELP = `
 firestore-migrator – declarative migrations for Cloud Firestore
 
@@ -10,7 +12,7 @@ Commands:
   init                           Create firestore-migrator.toml in the current directory
   generate <name> [collection]   Create a new migration file
   migrate                        Apply all pending migrations
-  rollback                       Roll back the latest applied migration(s)
+  rollback [steps]               Roll back the latest applied migration(s)
   schema [collections...]        Sample collections and write firestore.schema.json
   status                         List migrations and their state
 
@@ -21,10 +23,12 @@ Global options:
   -d, --migrations-dir <path>    Migrations directory (default: ./migrations)
   -t, --tracking-collection <n>  Tracking collection (default: __migrations)
   --schema-path <path>           Schema output path (default: ./firestore.schema.json)
-	--snapshots-dir <path>         Before-image snapshots dir (default: <migrations>/.snapshots)
+  --snapshots-dir <path>         Before-image snapshots dir (default: <migrations>/.snapshots)
   --project-id <id>              Firebase / GCP project id
   -c, --credentials <path>       Path to service account JSON
   --batch-size <n>               Max ops per batch (default: 400)
+  --only <name|id>               Apply or roll back only the specified migration
+  --steps <n>                    Number of migrations to roll back (default: 1)
   --dry-run                      Simulate without writing
   --skip-schema                  Do not refresh schema after migrate/rollback
   --no-merge                     schema: replace file instead of merging collections
@@ -108,7 +112,14 @@ async function main() {
   const command = positional[0];
 
   if (flags.version) {
-    console.log("0.5.0");
+    try {
+      const pkg = JSON.parse(
+        fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")
+      );
+      console.log(pkg.version);
+    } catch {
+      console.log("0.5.0");
+    }
 
     return;
   }
@@ -165,6 +176,10 @@ async function main() {
     }
 
     if (command === "rollback" || command === "down") {
+      if (!flags.steps && positional[1] && /^\d+$/.test(positional[1])) {
+        flags.steps = positional[1];
+      }
+
       const { runRollback } = await import("../lib/rollback.js");
 
       await runRollback(flags);

@@ -1,6 +1,6 @@
 {
   "name": "@schorts/firestore-migrator",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "license": "LGPL-3.0-or-later",
   "type": "module",
   "engines": {
@@ -26,12 +26,12 @@
     "firestore-migrator": "./bin/firestore-migrator.js"
   },
   "scripts": {
-		"init": "node bin/firestore-migrator.js init",
+    "init": "node bin/firestore-migrator.js init",
     "generate": "node bin/firestore-migrator.js generate",
     "migrate": "node bin/firestore-migrator.js migrate",
     "rollback": "node bin/firestore-migrator.js rollback",
     "status": "node bin/firestore-migrator.js status",
-		"schema": "node bin/firestore-migrator.js schema"
+    "schema": "node bin/firestore-migrator.js schema"
   },
   "dependencies": {
     "firebase-admin": "^14.3.0"
