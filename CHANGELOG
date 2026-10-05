@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0]
+
+### Added
+
+- Added `generate` operation to `up`: create new documents in the migration's collection from records of a source collection, with batched writes, optional deterministic ids, fan-out arrays, and `where` filters.
+- Snapshots now record generated documents in a `created` section; failure compensation and rollback erase every document the run generated and restore committed field changes.
+- Migrations abort when a generated destination id already exists or is produced twice in the same run (never skipped or overwritten).
+- Rejected `down.generate` at load time — generated documents are only erased from a snapshot.
+
 ## [0.5.1]
 
 ### Fixed
