@@ -26,7 +26,6 @@ Global options:
   --snapshots-dir <path>         Before-image snapshots dir (default: <migrations>/.snapshots)
   --project-id <id>              Firebase / GCP project id
   -c, --credentials <path>       Path to service account JSON
-  --batch-size <n>               Max ops per batch (default: 400)
   --only <name|id>               Apply or roll back only the specified migration
   --steps <n>                    Number of migrations to roll back (default: 1)
   --dry-run                      Simulate without writing
@@ -89,8 +88,6 @@ function parseArgs(argv) {
       flags.projectId = args[++i];
     } else if (a === "-c" || a === "--credentials") {
       flags.credentials = args[++i];
-    } else if (a === "--batch-size") {
-      flags.batchSize = args[++i];
     } else if (a === "--only") {
       flags.only = args[++i];
     } else if (a === "--steps") {

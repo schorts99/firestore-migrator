@@ -16,7 +16,6 @@ tracking_collection  = "__migrations"
 schema_path          = "firestore.schema.json"
 # Before-images for migrate failure + rollback (default: <migrations_dir>/.snapshots)
 snapshots_dir        = "migrations/.snapshots"
-batch_size           = 400
 skip_schema          = false
 
 # ── firebase project ───────────────────────────────────────────
