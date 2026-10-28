@@ -85,7 +85,6 @@ firestore-migrator status
 | `--snapshots-dir <path>` | Before-image snapshots directory (default: `<migrationsDir>/.snapshots`) |
 | `--project-id <id>` | GCP / Firebase project id |
 | `-c, --credentials <path>` | Path to service account JSON |
-| `--batch-size <n>` | Max writes per Firestore batch (default: `400`) |
 | `--only <name|id>` | Apply or roll back only the specified migration |
 | `--steps <n>` | Rollback only: number of migrations to revert (default: `1`) |
 | `--dry-run` | Simulate without writing |
@@ -139,7 +138,6 @@ migrations_dir       = "migrations"
 tracking_collection  = "__migrations"
 schema_path          = "firestore.schema.json"
 snapshots_dir        = "migrations/.snapshots"
-batch_size           = 400
 skip_schema          = false
 
 # firebase
@@ -171,7 +169,6 @@ String values support `${VAR}` and `$VAR` expansion. The optional `[env]` sectio
 | `FIRESTORE_MIGRATIONS_TRACKING` | Tracking collection name |
 | `FIRESTORE_SCHEMA_PATH` | Schema file path |
 | `FIRESTORE_SNAPSHOTS_DIR` | Snapshots directory |
-| `FIRESTORE_MIGRATIONS_BATCH_SIZE` | Batch size |
 | `FIRESTORE_SKIP_SCHEMA` | `1` or `true` to skip schema refresh |
 
 ## Migration file format
@@ -223,6 +220,8 @@ During `migrate`, before each document is updated a **before-image** is written 
 ```text
 <migrationsDir>/.snapshots/<migrationId>.json
 ```
+
+Before-images are first appended to a temporary `.journal` file before their writes are queued; the journal is folded into the snapshot when the migration completes and is read during recovery.
 
 Example:
 
@@ -313,12 +312,12 @@ One document is sampled per collection (`limit(1)`). Empty collections are recor
 1. `.env` / `.env.local` is loaded into `process.env` (if present).
 2. Migration files live in `./migrations` (or `migrations_dir`) and are named `YYYYMMDDHHmmss_<slug>.js`.
 3. Applied migrations are recorded in a tracking collection (`__migrations` by default).
-4. `migrate` runs pending files in timestamp order, applying `up` with batched writes and writing before-image snapshots.
+4. `migrate` runs pending files in timestamp order, applying `up` with BulkWriter and writing before-image snapshots.
 5. **On failure mid-migration**, committed docs are restored from the **snapshot**. The migration is **not** marked applied.
 6. **`rollback`** restores from the snapshot when present; otherwise uses declarative `down`. Tracking record is removed.
 7. Schema is optionally refreshed for touched collections after migrate/rollback.
 
-Collections are paginated so large datasets stay memory-safe. `add` skips fields that already exist.
+Collections are paginated so large datasets stay memory-safe. BulkWriter manages write scheduling. `add` skips fields that already exist.
 
 ## Programmatic usage
 
